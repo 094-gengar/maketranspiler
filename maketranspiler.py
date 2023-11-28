@@ -6,7 +6,7 @@ from secret_information import *
 """
 デバッグ出力とエラー出力
 """
-debug = True
+debug = False
 def debug_print(a):
     if debug:
         print("# # # # # #")
@@ -22,7 +22,7 @@ def error_print(s: str):
 インタプリタクラス
 """
 class inner_transpiler_class():
-    llm = Llama(model_path=LLAMA_PATH, seed=0)
+    llm = Llama(model_path=LLAMA_PATH, seed=0, verbose=debug)
     def query(self, s: str) -> str:
         prompt = self.llm("[PROMPT]\n" + s + "[/PROMPT]\n", temperature=2, repeat_penalty=1.0, max_tokens=500, stop=["\n\n\n\n"], echo=True)
         # prompt = self.llm(s, temperature=2, repeat_penalty=1.0, max_tokens=500, stop=["\n\n\n\n"], echo=True)
@@ -58,7 +58,7 @@ f"""
 ```
 
 """
-        # debug_print(self.transpile_prompt)
+        debug_print(self.transpile_prompt)
 
     def transpile_code(self, code: str) -> str:
         prompt = self.transpile_prompt + "\nReferring to the above examples, transpile the following code to {}.\n\n".format(self.base_lang)
@@ -68,7 +68,7 @@ f"""
 {code}
 ```
 """
-        # debug_print(prompt)
+        debug_print(prompt)
         ret = self.inner_transpiler.query(prompt)
         matches = re.findall(r'\[/PROMPT][\s\S]*?```(.*?)```', ret, re.DOTALL)
         if len(matches) == 0:
