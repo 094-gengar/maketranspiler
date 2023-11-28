@@ -1,7 +1,6 @@
 from llama_cpp import Llama # I use `codellama-13b-instruct.Q5_K_M.gguf`
-import re
-
 from secret_information import *
+import re
 
 """
 デバッグ出力とエラー出力
@@ -16,75 +15,53 @@ def debug_print(a):
 def error_print(s: str):
     print("error: " + s)
 
+"""
+インタプリタクラスの補助クラス
+"""
+class inner_transpiler_class():
+    def __init__(self, base_lang: str) -> None:
+        self.base_lang = base_lang
+        self.history = []
 
+    llm = Llama(model_path=LLAMA_PATH, seed=0, verbose=debug, n_ctx=2048)
+    def query(self, s: str) -> str:
+        messages = self.history
+        messages.append({
+            "role": "user",
+            "content": f"Please transpile this 'Mylang' code to {self.base_lang} (please write the code to the end) :\n```\n{s}\n```\n",
+        })
+        streamer = self.llm.create_chat_completion(messages, stream=True)
+        ans = ""
+        for msg in streamer:
+            message = msg["choices"][0]["delta"]
+            if "content" in message:
+                ans += message["content"]
+
+        debug_print(ans)
+        return ans
 
 """
 インタプリタクラス
 """
-class inner_transpiler_class():
-    llm = Llama(model_path=LLAMA_PATH, seed=0, verbose=debug)
-    def query(self, s: str) -> str:
-        prompt = self.llm("[PROMPT]\n" + s + "[/PROMPT]\n", temperature=2, repeat_penalty=1.0, max_tokens=500, stop=["\n\n\n\n"], echo=True)
-        # prompt = self.llm(s, temperature=2, repeat_penalty=1.0, max_tokens=500, stop=["\n\n\n\n"], echo=True)
-        return prompt["choices"][0]["text"]
-
 class transpiler_class():
     def __init__(self, base_lang: str) -> None:
         self.base_lang = base_lang
-        self.example_list = []
-        self.example_stack = []
-        self.transpile_prompt = "These are some examples of conversion between 'MyLang' and {} :\n".format(base_lang)
-        self.inner_transpiler = inner_transpiler_class()
+        self.inner_transpiler = inner_transpiler_class(base_lang=base_lang)
+        self.inner_transpiler.history.append({"role" : "user", "content" : f"Please transpile some 'Mylang' codes to {base_lang}.\n"})
+        self.inner_transpiler.history.append({"role" : "system", "content" : "Ok.\n"})
 
     def add_example(self, before: str, after: str) -> None:
-        self.example_stack.append((before, after))
-
-    def update_transpiler(self) -> None:
-        while self.example_stack:
-            before, after = self.example_stack.pop()
-            self.example_list.append((before, after))
-            self.transpile_prompt += \
-f"""
-# example {len(self.example_list)}:
-
-## before (MyLang code) :
-```
-{before}
-```
-
-## after (code transpiled to {self.base_lang}) :
-```
-{after}
-```
-
-"""
-        debug_print(self.transpile_prompt)
+        self.inner_transpiler.history.append({"role" : "user", "content" : f"Please transpile this 'Mylang' code to {self.base_lang} (please write the code to the end) :\n```\n{before}\n```\n"})
+        self.inner_transpiler.history.append({"role" : "system", "content" : f"```\n{after}\n```\n"})
 
     def transpile_code(self, code: str) -> str:
-        prompt = self.transpile_prompt + "\nReferring to the above examples, transpile the following code to {}.\n\n".format(self.base_lang)
-        prompt += f"""
-## before (MyLang code) :
-```
-{code}
-```
-"""
-        debug_print(prompt)
-        ret = self.inner_transpiler.query(prompt)
-        matches = re.findall(r'\[/PROMPT][\s\S]*?```(.*?)```', ret, re.DOTALL)
+        debug_print(self.inner_transpiler.history)
+        ret = self.inner_transpiler.query(s=code)
+        matches = re.findall(r'```(.*?)```', ret, re.DOTALL)
         if len(matches) == 0:
             error_print("INNER ERROR (not matched)")
             return ""
         return matches[0]
 
-        # output = self.inner_transpiler.llm(prompt, temperature=2, repeat_penalty=1.0, max_tokens=1000, stop=["\n\n\n\n"], echo=True)
-        # return output["choices"][0]["text"]
-
-    def update_and_transpile_code(self, code: str) -> str:
-        self.update_transpiler()
-        self.transpile_code(code)
-
     def make_documents(self) -> str:
-        prompt = "Make the short documentation of this programming language."
-        return self.inner_transpiler.query(prompt)
-        # output = self.inner_transpiler.llm(prompt, temperature=2, repeat_penalty=1.0, max_tokens=1000, stop=["\n\n\n\n"], echo=True)
-        # return output["choices"][0]["text"]
+        pass # TODO

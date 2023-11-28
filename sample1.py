@@ -15,9 +15,8 @@ transpiler.add_example( \
     out(i)
 }""",
 """for i in range(1, 1000):
-print(i)""")
+    print(i)""")
 
-transpiler.update_transpiler()
 print(transpiler.transpile_code( \
 """for i in 0..10 {
     out("No.", i)
